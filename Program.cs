@@ -12,51 +12,129 @@ internal static class Program
     private const int FIVE = 4;
     private const int SIX = 5;
 
-    private static int[]? m_Dice;
-    private static int[]? m_Count;
-    private static Random? m_Rnd;
+    private static int[] _dice = [0, 0, 0, 0, 0, 0];
+    private static int[] _count = [0, 0, 0, 0, 0, 0];
+    private static Random _rnd = Random.Shared;
 
-    private static void SeedRng(ref string[] args)
+    private static void Main(string[] args)
     {
-        int iSeed = 0;
-        bool bSeed = false;
-        if (args.Length > 0)
-            bSeed = int.TryParse(args[0], out iSeed);
-        m_Rnd = bSeed ? new Random(iSeed) : new Random();
+        SeedRng(args);
+        Play();
     }
 
-    private static bool IsLargeStraight(int nDice)
-        => m_Count != null &&
-                nDice == 6 &&
-                m_Count[ONE] == 1 &&
-                m_Count[TWO] == 1 &&
-                m_Count[THREE] == 1 &&
-                m_Count[FOUR] == 1 &&
-                m_Count[FIVE] == 1 &&
-                m_Count[SIX] == 1;
-
-    private static bool Is3Pair(int nDice)
+    private static void Play()
     {
-        bool bIs3Pair = false;
-        if (nDice == 6)
+        Scoring();
+
+        bool bConvert;
+        int nPlayers, nPeople = 0;
+        do
         {
-            int n3Pair = 0;
-            if (m_Count?[ONE] == 2)
-                n3Pair++;
-            if (m_Count?[TWO] == 2)
-                n3Pair++;
-            if (m_Count?[THREE] == 2)
-                n3Pair++;
-            if (m_Count?[FOUR] == 2)
-                n3Pair++;
-            if (m_Count?[FIVE] == 2)
-                n3Pair++;
-            if (m_Count?[SIX] == 2)
-                n3Pair++;
-            bIs3Pair = n3Pair == 3;
+            Write("Number of players? ");
+            string? strPlayers = ReadLine();
+            bConvert = int.TryParse(strPlayers, out nPlayers);
+            if (bConvert)
+            {
+                if (nPlayers < 2)
+                {
+                    WriteLine("Not enough players");
+                    bConvert = false;
+                }
+                else
+                {
+                    Write("How many are CPU? ");
+                    string? strCPUs = ReadLine();
+                    bConvert = int.TryParse(strCPUs, out int nCPUs);
+                    if (!bConvert)
+                    {
+                        WriteLine("Input error, try again");
+                    }
+                    else
+                    {
+                        if (nCPUs < 0)
+                        {
+                            WriteLine("There must be 0 or more CPU players");
+                            bConvert = false;
+                        }
+                        else
+                        {
+                            if (nCPUs > nPlayers)
+                            {
+                                WriteLine("Too many CPUs");
+                                bConvert = false;
+                            }
+                            else
+                            {
+                                nPeople = nPlayers - nCPUs;
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                WriteLine("Input error, try again");
+            }
+        } while (!bConvert);
+
+        WriteLine("\r\nStarting order is Player(s) first, CPU(s) second. Good Luck!\r\n");
+
+        int[] PlayerScore = new int[nPlayers];
+
+        bool bGameLoop = true;
+        while (bGameLoop)
+        {
+            WriteLine("Lesters Teeth\r\n");
+            for (int iPlayer = 0; iPlayer < nPlayers; iPlayer++)
+            {
+                if (iPlayer < nPeople)
+                    PlayerScore[iPlayer] = RollPlayer(PlayerScore[iPlayer], iPlayer + 1);
+                else
+                    PlayerScore[iPlayer] = RollCPU(PlayerScore[iPlayer], iPlayer + 1);
+
+                if (PlayerScore[iPlayer] > 10000)
+                {
+                    bGameLoop = false;
+                    break;
+                }
+            }
         }
-        return bIs3Pair;
+
+        WriteLine();
+        for (int iPlayer = 0; iPlayer < nPlayers; iPlayer++)
+        {
+            if (PlayerScore[iPlayer] > 10000)
+            {
+                if (iPlayer < nPeople)
+                    WriteLine($"Player {iPlayer + 1} scores {PlayerScore[iPlayer]} and wins!");
+                else
+                    WriteLine($"CPU {iPlayer + 1 - nPeople} scores {PlayerScore[iPlayer]} and wins!");
+            }
+            else
+            {
+                if (iPlayer < nPeople)
+                    WriteLine($"Player {iPlayer + 1} scores {PlayerScore[iPlayer]} and loses!");
+                else
+                    WriteLine($"CPU {iPlayer + 1 - nPeople} scores {PlayerScore[iPlayer]} and loses!");
+            }
+        }
+
+        WriteLine();
+        WriteLine("Press A to play again.\r\n");
+        string key = ReadKey(true).KeyChar.ToString();
+        if (string.Equals(key, "A", StringComparison.OrdinalIgnoreCase))
+            Play();
     }
+
+    private static void SeedRng(string[] args)
+    {
+        if (args.Length > 0 && int.TryParse(args[0], out int iSeed))
+            _rnd = new Random(iSeed);
+    }
+
+    private static bool IsLargeStraight(int nDice) => nDice == 6 && _count.Count(x => x == 1) == 6;
+
+    private static bool Is3Pair(int nDice) => nDice == 6 && _count.Count(x => x == 2) == 3;
 
     private static int RollPlayer(int iGameScorePlayer, int iPlayerID)
     {
@@ -74,32 +152,31 @@ internal static class Program
                     WriteLine("Press R to roll, S to score");
                 else
                     WriteLine("Press R to roll");
+
                 ConsoleKeyInfo cki = ReadKey(true);
                 string strKey = cki.KeyChar.ToString();
-                if (iRollScore >= 500 || iGameScorePlayer >= 500)
+
+                if ((iRollScore >= 500 || iGameScorePlayer >= 500) && string.Equals(strKey, "S", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (strKey == "S" || strKey == "s")
-                    {
-                        bRollLoop = false;
-                        break;
-                    }
+                    bRollLoop = false;
+                    break;
                 }
-                if (strKey == "R" || strKey == "r")
+                if (string.Equals(strKey, "R", StringComparison.OrdinalIgnoreCase))
                     break;
             }
 
             if (!bRollLoop)
                 break;
 
-            Write(" Roll {0}: ", nRoll + 1);
+            Write($" Roll {nRoll + 1}: ");
             int iTempScore = 0;
-            m_Dice = [0, 0, 0, 0, 0, 0];
-            m_Count = [0, 0, 0, 0, 0, 0];
+            _dice = [0, 0, 0, 0, 0, 0];
+            _count = [0, 0, 0, 0, 0, 0];
             for (int iDie = 0; iDie < nDice; iDie++)
             {
-                m_Dice[iDie] = m_Rnd.Next(1, 7);
-                m_Count[m_Dice[iDie] - 1]++;
-                Write("{0} ", m_Dice[iDie]);
+                _dice[iDie] = _rnd.Next(1, 7);
+                _count[_dice[iDie] - 1]++;
+                Write("{0} ", _dice[iDie]);
             }
             WriteLine();
 
@@ -107,9 +184,9 @@ internal static class Program
             const bool bWriteCount = true;
             if (bWriteCount)
             {
-                Write("Count {0}: ", nRoll + 1);
+                Write($"Count {nRoll + 1}: ");
                 for (int iDie = 0; iDie < 6; iDie++)
-                    Write("{0} ", m_Count[iDie]);
+                    Write($"{_count[iDie]} ");
                 WriteLine();
             }
             WriteLine();
@@ -124,62 +201,60 @@ internal static class Program
             {
                 if (nMult == ONE)
                 {
-                    if (m_Count[ONE] > 0)
+                    if (_count[ONE] > 0)
                         bBuela = false;
                 }
-                else if (m_Count[ONE] > 2)
+                else if (_count[ONE] > 2)
                 {
                     bBuela = false;
                 }
                 else if (nMult == SIX)
                 {
-                    if (m_Count[SIX] > 0)
+                    if (_count[SIX] > 0)
                         bBuela = false;
                 }
-                else if (m_Count[SIX] >= 3)
+                else if (_count[SIX] >= 3)
                 {
                     bBuela = false;
                 }
                 else if (nMult == FIVE)
                 {
-                    if (m_Count[FIVE] > 0)
+                    if (_count[FIVE] > 0)
                         bBuela = false;
                 }
-                else if (m_Count[FIVE] >= 3)
+                else if (_count[FIVE] >= 3)
                 {
                     bBuela = false;
                 }
                 else if (nMult == FOUR)
                 {
-                    if (m_Count[FOUR] > 0)
+                    if (_count[FOUR] > 0)
                         bBuela = false;
                 }
-                else if (m_Count[FOUR] >= 3)
+                else if (_count[FOUR] >= 3)
                 {
                     bBuela = false;
                 }
                 else if (nMult == THREE)
                 {
-                    if (m_Count[THREE] > 0)
+                    if (_count[THREE] > 0)
                         bBuela = false;
                 }
-                else if (m_Count[THREE] >= 3)
+                else if (_count[THREE] >= 3)
                 {
                     bBuela = false;
                 }
                 else if (nMult == TWO)
                 {
-                    if (m_Count[TWO] > 0)
+                    if (_count[TWO] > 0)
                         bBuela = false;
                 }
-                else if (m_Count[TWO] >= 3)
+                else if (_count[TWO] >= 3)
                 {
                     bBuela = false;
                 }
 
-                if (m_Count[ONE] > 0 && m_Count[ONE] < 3)
-                    bBuela = false;
-                if (m_Count[FIVE] > 0 && m_Count[FIVE] < 3)
+                if ((_count[ONE] > 0 && _count[ONE] < 3) || (_count[FIVE] > 0 && _count[FIVE] < 3))
                     bBuela = false;
             }
 
@@ -196,7 +271,7 @@ internal static class Program
                     bool bChoose = true;
                     do
                     {
-                        int[] Count = [m_Count[0], m_Count[1], m_Count[2], m_Count[3], m_Count[4], m_Count[5]];
+                        int[] Count = [_count[0], _count[1], _count[2], _count[3], _count[4], _count[5]];
                         int[] Count2 = [0, 0, 0, 0, 0, 0];
 
                         Write("Pick up score dice: ");
@@ -230,7 +305,7 @@ internal static class Program
                             if (!bError)
                             {
                                 for (int i = 0; i < 6; i++)
-                                    m_Count[i] = Count2[i];
+                                    _count[i] = Count2[i];
                                 bChoose = false;
                             }
                         }
@@ -244,7 +319,7 @@ internal static class Program
                         iTempScore += 1500;
                         WriteLine("Roll {0} - Large Straight - Total {1}", nRoll + 1, iTempScore);
                         for (int iDie = ONE; iDie <= SIX; iDie++)
-                            m_Count[iDie] = 0;
+                            _count[iDie] = 0;
                         nDice = 0;
                         nMult = ZERO;
                     }
@@ -257,7 +332,7 @@ internal static class Program
                             iTempScore += 500;
                             WriteLine("Roll {0} - Three Pair - Total {1}", nRoll + 1, iTempScore);
                             for (int iDie = ONE; iDie <= SIX; iDie++)
-                                m_Count[iDie] = 0;
+                                _count[iDie] = 0;
                             nDice = 0;
                             nMult = ZERO;
                         }
@@ -265,152 +340,152 @@ internal static class Program
                         {
                             if (nMult == ONE)
                             {
-                                if (m_Count[ONE] > 0)
+                                if (_count[ONE] > 0)
                                 {
-                                    iTempScore += m_Count[ONE] * 1000;
-                                    WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, m_Count[ONE], iTempScore);
-                                    nDice -= m_Count[ONE];
-                                    m_Count[ONE] = 0;
+                                    iTempScore += _count[ONE] * 1000;
+                                    WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, _count[ONE], iTempScore);
+                                    nDice -= _count[ONE];
+                                    _count[ONE] = 0;
                                 }
                                 else
                                 {
                                     nMult = ZERO;
                                 }
                             }
-                            else if (m_Count[ONE] >= 3)
+                            else if (_count[ONE] >= 3)
                             {
                                 // Eintausend - 1000
-                                iTempScore += (m_Count[ONE] - 2) * 1000;
-                                WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, m_Count[ONE], iTempScore);
-                                nDice -= m_Count[ONE];
-                                m_Count[ONE] = 0;
+                                iTempScore += (_count[ONE] - 2) * 1000;
+                                WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, _count[ONE], iTempScore);
+                                nDice -= _count[ONE];
+                                _count[ONE] = 0;
                                 nMult = ONE;
                             }
                             else if (nMult == SIX)
                             {
-                                if (m_Count[SIX] > 0)
+                                if (_count[SIX] > 0)
                                 {
-                                    iTempScore += m_Count[SIX] * 600;
-                                    WriteLine("Roll {0} - {1} Sixes - Total {2}", nRoll + 1, m_Count[SIX], iTempScore);
-                                    nDice -= m_Count[SIX];
-                                    m_Count[SIX] = 0;
+                                    iTempScore += _count[SIX] * 600;
+                                    WriteLine("Roll {0} - {1} Sixes - Total {2}", nRoll + 1, _count[SIX], iTempScore);
+                                    nDice -= _count[SIX];
+                                    _count[SIX] = 0;
                                 }
                                 else
                                 {
                                     nMult = ZERO;
                                 }
                             }
-                            else if (m_Count[SIX] >= 3)
+                            else if (_count[SIX] >= 3)
                             {
-                                iTempScore += (m_Count[SIX] - 2) * 600;
-                                WriteLine("Roll {0} - {1} Sixes - Total {2}", nRoll + 1, m_Count[SIX], iTempScore);
-                                nDice -= m_Count[SIX];
-                                m_Count[SIX] = 0;
+                                iTempScore += (_count[SIX] - 2) * 600;
+                                WriteLine("Roll {0} - {1} Sixes - Total {2}", nRoll + 1, _count[SIX], iTempScore);
+                                nDice -= _count[SIX];
+                                _count[SIX] = 0;
                                 nMult = SIX;
                             }
                             else if (nMult == FIVE)
                             {
-                                if (m_Count[FIVE] > 0)
+                                if (_count[FIVE] > 0)
                                 {
-                                    iTempScore += m_Count[FIVE] * 500;
-                                    WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, m_Count[FIVE], iTempScore);
-                                    nDice -= m_Count[FIVE];
-                                    m_Count[FIVE] = 0;
+                                    iTempScore += _count[FIVE] * 500;
+                                    WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, _count[FIVE], iTempScore);
+                                    nDice -= _count[FIVE];
+                                    _count[FIVE] = 0;
                                 }
                                 else
                                 {
                                     nMult = ZERO;
                                 }
                             }
-                            else if (m_Count[FIVE] >= 3)
+                            else if (_count[FIVE] >= 3)
                             {
-                                iTempScore += (m_Count[FIVE] - 2) * 500;
-                                WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, m_Count[FIVE], iTempScore);
-                                nDice -= m_Count[FIVE];
-                                m_Count[FIVE] = 0;
+                                iTempScore += (_count[FIVE] - 2) * 500;
+                                WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, _count[FIVE], iTempScore);
+                                nDice -= _count[FIVE];
+                                _count[FIVE] = 0;
                                 nMult = FIVE;
                             }
                             else if (nMult == FOUR)
                             {
-                                if (m_Count[FOUR] > 0)
+                                if (_count[FOUR] > 0)
                                 {
-                                    iTempScore += m_Count[FOUR] * 400;
-                                    WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, m_Count[FOUR], iTempScore);
-                                    nDice -= m_Count[FOUR];
-                                    m_Count[FOUR] = 0;
+                                    iTempScore += _count[FOUR] * 400;
+                                    WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, _count[FOUR], iTempScore);
+                                    nDice -= _count[FOUR];
+                                    _count[FOUR] = 0;
                                 }
                                 else
                                 {
                                     nMult = ZERO;
                                 }
                             }
-                            else if (m_Count[FOUR] >= 3)
+                            else if (_count[FOUR] >= 3)
                             {
-                                iTempScore += (m_Count[FOUR] - 2) * 400;
-                                WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, m_Count[FOUR], iTempScore);
-                                nDice -= m_Count[FOUR];
-                                m_Count[FOUR] = 0;
+                                iTempScore += (_count[FOUR] - 2) * 400;
+                                WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, _count[FOUR], iTempScore);
+                                nDice -= _count[FOUR];
+                                _count[FOUR] = 0;
                                 nMult = FOUR;
                             }
                             else if (nMult == THREE)
                             {
-                                if (m_Count[THREE] > 0)
+                                if (_count[THREE] > 0)
                                 {
-                                    iTempScore += m_Count[THREE] * 300;
-                                    WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, m_Count[THREE], iTempScore);
-                                    nDice -= m_Count[THREE];
-                                    m_Count[THREE] = 0;
+                                    iTempScore += _count[THREE] * 300;
+                                    WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, _count[THREE], iTempScore);
+                                    nDice -= _count[THREE];
+                                    _count[THREE] = 0;
                                 }
                                 else
                                 {
                                     nMult = ZERO;
                                 }
                             }
-                            else if (m_Count[THREE] >= 3)
+                            else if (_count[THREE] >= 3)
                             {
-                                iTempScore += (m_Count[THREE] - 2) * 300;
-                                WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, m_Count[THREE], iTempScore);
-                                nDice -= m_Count[THREE];
-                                m_Count[THREE] = 0;
+                                iTempScore += (_count[THREE] - 2) * 300;
+                                WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, _count[THREE], iTempScore);
+                                nDice -= _count[THREE];
+                                _count[THREE] = 0;
                                 nMult = THREE;
                             }
                             else if (nMult == TWO)
                             {
-                                if (m_Count[TWO] > 0)
+                                if (_count[TWO] > 0)
                                 {
-                                    iTempScore += m_Count[TWO] * 200;
-                                    WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, m_Count[TWO], iTempScore);
-                                    nDice -= m_Count[TWO];
-                                    m_Count[TWO] = 0;
+                                    iTempScore += _count[TWO] * 200;
+                                    WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, _count[TWO], iTempScore);
+                                    nDice -= _count[TWO];
+                                    _count[TWO] = 0;
                                 }
                                 else
                                 {
                                     nMult = ZERO;
                                 }
                             }
-                            else if (m_Count[TWO] >= 3)
+                            else if (_count[TWO] >= 3)
                             {
-                                iTempScore += (m_Count[TWO] - 2) * 200;
-                                WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, m_Count[TWO], iTempScore);
-                                nDice -= m_Count[TWO];
-                                m_Count[TWO] = 0;
+                                iTempScore += (_count[TWO] - 2) * 200;
+                                WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, _count[TWO], iTempScore);
+                                nDice -= _count[TWO];
+                                _count[TWO] = 0;
                                 nMult = TWO;
                             }
 
-                            if (m_Count[ONE] > 0 && m_Count[ONE] < 3)
+                            if (_count[ONE] > 0 && _count[ONE] < 3)
                             {
-                                iTempScore += m_Count[ONE] * 100;
-                                WriteLine("Roll {0} - 100 - Score {1} - Total {2}", nRoll + 1, m_Count[0] * 100, iTempScore);
-                                nDice -= m_Count[ONE];
-                                m_Count[ONE] = 0;
+                                iTempScore += _count[ONE] * 100;
+                                WriteLine("Roll {0} - 100 - Score {1} - Total {2}", nRoll + 1, _count[0] * 100, iTempScore);
+                                nDice -= _count[ONE];
+                                _count[ONE] = 0;
                                 nMult = ZERO;
                             }
-                            if (m_Count[FIVE] > 0 && m_Count[FIVE] < 3)
+                            if (_count[FIVE] > 0 && _count[FIVE] < 3)
                             {
-                                iTempScore += m_Count[FIVE] * 50;
-                                WriteLine("Roll {0} - 50 - Score {1} - Total {2}", nRoll + 1, m_Count[0] * 50, iTempScore);
-                                nDice -= m_Count[FIVE];
-                                m_Count[FIVE] = 0;
+                                iTempScore += _count[FIVE] * 50;
+                                WriteLine("Roll {0} - 50 - Score {1} - Total {2}", nRoll + 1, _count[0] * 50, iTempScore);
+                                nDice -= _count[FIVE];
+                                _count[FIVE] = 0;
                                 nMult = ZERO;
                             }
                         }
@@ -456,13 +531,13 @@ internal static class Program
         {
             Write(" Roll {0}: ", nRoll + 1);
             int iTempScore = 0;
-            m_Dice = [0, 0, 0, 0, 0, 0];
-            m_Count = [0, 0, 0, 0, 0, 0];
+            _dice = [0, 0, 0, 0, 0, 0];
+            _count = [0, 0, 0, 0, 0, 0];
             for (int iDie = 0; iDie < nDice; iDie++)
             {
-                m_Dice[iDie] = m_Rnd.Next(1, 7);
-                m_Count[m_Dice[iDie] - 1]++;
-                Write("{0} ", m_Dice[iDie]);
+                _dice[iDie] = _rnd.Next(1, 7);
+                _count[_dice[iDie] - 1]++;
+                Write("{0} ", _dice[iDie]);
             }
             WriteLine();
 
@@ -472,7 +547,7 @@ internal static class Program
             {
                 Write("Count {0}: ", nRoll + 1);
                 for (int iDie = 0; iDie < 6; iDie++)
-                    Write("{0} ", m_Count[iDie]);
+                    Write("{0} ", _count[iDie]);
                 WriteLine();
             }
             WriteLine();
@@ -488,7 +563,7 @@ internal static class Program
                 iTempScore += 1500;
                 WriteLine("Roll {0} - Large Straight - Total {1}", nRoll + 1, iTempScore);
                 for (int iDie = ONE; iDie <= SIX; iDie++)
-                    m_Count[iDie] = 0;
+                    _count[iDie] = 0;
                 nDice = 0;
                 nMult = ZERO;
             }
@@ -500,7 +575,7 @@ internal static class Program
                     iTempScore += 500;
                     WriteLine("Roll {0} - Three Pair - Total {1}", nRoll + 1, iTempScore);
                     for (int iDie = ONE; iDie <= SIX; iDie++)
-                        m_Count[iDie] = 0;
+                        _count[iDie] = 0;
                     nDice = 0;
                     nMult = ZERO;
                 }
@@ -508,153 +583,153 @@ internal static class Program
                 {
                     if (nMult == ONE)
                     {
-                        if (m_Count[ONE] > 0)
+                        if (_count[ONE] > 0)
                         {
-                            iTempScore += m_Count[ONE] * 1000;
-                            WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, m_Count[ONE], iTempScore);
-                            nDice -= m_Count[ONE];
-                            m_Count[ONE] = 0;
+                            iTempScore += _count[ONE] * 1000;
+                            WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, _count[ONE], iTempScore);
+                            nDice -= _count[ONE];
+                            _count[ONE] = 0;
                         }
                         else
                         {
                             nMult = ZERO;
                         }
                     }
-                    else if (m_Count[ONE] >= 3)
+                    else if (_count[ONE] >= 3)
                     {
                         // Eintausend - 1000
-                        iTempScore += (m_Count[ONE] - 2) * 1000;
-                        WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, m_Count[ONE], iTempScore);
-                        nDice -= m_Count[ONE];
-                        m_Count[ONE] = 0;
+                        iTempScore += (_count[ONE] - 2) * 1000;
+                        WriteLine("Roll {0} - {1} Ones - Total {2}", nRoll + 1, _count[ONE], iTempScore);
+                        nDice -= _count[ONE];
+                        _count[ONE] = 0;
                         nMult = ONE;
                     }
                     else if (nMult == SIX)
                     {
-                        if (m_Count[SIX] > 0)
+                        if (_count[SIX] > 0)
                         {
-                            iTempScore += m_Count[SIX] * 600;
-                            WriteLine("Roll {0} - {1} Sixes - Total {2}", nRoll + 1, m_Count[SIX], iTempScore);
-                            nDice -= m_Count[SIX];
-                            m_Count[SIX] = 0;
+                            iTempScore += _count[SIX] * 600;
+                            WriteLine("Roll {0} - {1} Sixes - Total {2}", nRoll + 1, _count[SIX], iTempScore);
+                            nDice -= _count[SIX];
+                            _count[SIX] = 0;
                         }
                         else
                         {
                             nMult = ZERO;
                         }
                     }
-                    else if (m_Count[SIX] >= 3)
+                    else if (_count[SIX] >= 3)
                     {
-                        iTempScore += (m_Count[SIX] - 2) * 600;
-                        WriteLine("Roll {0} - {1} Six(es) - Total {2}", nRoll + 1, m_Count[SIX], iTempScore);
-                        nDice -= m_Count[SIX];
-                        m_Count[SIX] = 0;
+                        iTempScore += (_count[SIX] - 2) * 600;
+                        WriteLine("Roll {0} - {1} Six(es) - Total {2}", nRoll + 1, _count[SIX], iTempScore);
+                        nDice -= _count[SIX];
+                        _count[SIX] = 0;
                         nMult = SIX;
                     }
                     else if (nMult == FIVE)
                     {
-                        if (m_Count[FIVE] > 0)
+                        if (_count[FIVE] > 0)
                         {
-                            iTempScore += m_Count[FIVE] * 500;
-                            WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, m_Count[FIVE], iTempScore);
-                            nDice -= m_Count[FIVE];
-                            m_Count[FIVE] = 0;
+                            iTempScore += _count[FIVE] * 500;
+                            WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, _count[FIVE], iTempScore);
+                            nDice -= _count[FIVE];
+                            _count[FIVE] = 0;
                         }
                         else
                         {
                             nMult = ZERO;
                         }
                     }
-                    else if (m_Count[FIVE] >= 3)
+                    else if (_count[FIVE] >= 3)
                     {
-                        iTempScore += (m_Count[FIVE] - 2) * 500;
-                        WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, m_Count[FIVE], iTempScore);
-                        nDice -= m_Count[FIVE];
-                        m_Count[FIVE] = 0;
+                        iTempScore += (_count[FIVE] - 2) * 500;
+                        WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, _count[FIVE], iTempScore);
+                        nDice -= _count[FIVE];
+                        _count[FIVE] = 0;
                         nMult = FIVE;
                     }
                     else if (nMult == FOUR)
                     {
-                        if (m_Count[FOUR] > 0)
+                        if (_count[FOUR] > 0)
                         {
-                            iTempScore += m_Count[FOUR] * 400;
-                            WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, m_Count[FOUR], iTempScore);
-                            nDice -= m_Count[FOUR];
-                            m_Count[FOUR] = 0;
+                            iTempScore += _count[FOUR] * 400;
+                            WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, _count[FOUR], iTempScore);
+                            nDice -= _count[FOUR];
+                            _count[FOUR] = 0;
                         }
                         else
                         {
                             nMult = ZERO;
                         }
                     }
-                    else if (m_Count[FOUR] >= 3)
+                    else if (_count[FOUR] >= 3)
                     {
-                        iTempScore += (m_Count[FOUR] - 2) * 400;
-                        WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, m_Count[FOUR], iTempScore);
-                        nDice -= m_Count[FOUR];
-                        m_Count[FOUR] = 0;
+                        iTempScore += (_count[FOUR] - 2) * 400;
+                        WriteLine("Roll {0} - {1} Four(s) - Total {2}", nRoll + 1, _count[FOUR], iTempScore);
+                        nDice -= _count[FOUR];
+                        _count[FOUR] = 0;
                         nMult = FOUR;
                     }
                     else if (nMult == THREE)
                     {
-                        if (m_Count[THREE] > 0)
+                        if (_count[THREE] > 0)
                         {
-                            iTempScore += m_Count[THREE] * 300;
-                            WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, m_Count[THREE], iTempScore);
-                            nDice -= m_Count[THREE];
-                            m_Count[THREE] = 0;
+                            iTempScore += _count[THREE] * 300;
+                            WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, _count[THREE], iTempScore);
+                            nDice -= _count[THREE];
+                            _count[THREE] = 0;
                         }
                         else
                         {
                             nMult = ZERO;
                         }
                     }
-                    else if (m_Count[THREE] >= 3)
+                    else if (_count[THREE] >= 3)
                     {
-                        iTempScore += (m_Count[THREE] - 2) * 300;
-                        WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, m_Count[THREE], iTempScore);
-                        nDice -= m_Count[THREE];
-                        m_Count[THREE] = 0;
+                        iTempScore += (_count[THREE] - 2) * 300;
+                        WriteLine("Roll {0} - {1} Three(s) - Total {2}", nRoll + 1, _count[THREE], iTempScore);
+                        nDice -= _count[THREE];
+                        _count[THREE] = 0;
                         nMult = THREE;
                     }
                     else if (nMult == TWO)
                     {
-                        if (m_Count[TWO] > 0)
+                        if (_count[TWO] > 0)
                         {
-                            iTempScore += m_Count[TWO] * 200;
-                            WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, m_Count[TWO], iTempScore);
-                            nDice -= m_Count[TWO];
-                            m_Count[TWO] = 0;
+                            iTempScore += _count[TWO] * 200;
+                            WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, _count[TWO], iTempScore);
+                            nDice -= _count[TWO];
+                            _count[TWO] = 0;
                         }
                         else
                         {
                             nMult = ZERO;
                         }
                     }
-                    else if (m_Count[TWO] >= 3)
+                    else if (_count[TWO] >= 3)
                     {
-                        iTempScore += (m_Count[TWO] - 2) * 200;
-                        WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, m_Count[TWO], iTempScore);
-                        nDice -= m_Count[TWO];
-                        m_Count[TWO] = 0;
+                        iTempScore += (_count[TWO] - 2) * 200;
+                        WriteLine("Roll {0} - {1} Two(s) - Total {2}", nRoll + 1, _count[TWO], iTempScore);
+                        nDice -= _count[TWO];
+                        _count[TWO] = 0;
                         nMult = TWO;
                     }
 
-                    if (m_Count[ONE] > 0 && m_Count[ONE] < 3)
+                    if (_count[ONE] > 0 && _count[ONE] < 3)
                     {
-                        iTempScore += m_Count[ONE] * 100;
-                        WriteLine("Roll {0} - {1} Ones(s) - Total {2}", nRoll + 1, m_Count[ONE], iTempScore);
-                        nDice -= m_Count[ONE];
-                        m_Count[ONE] = 0;
+                        iTempScore += _count[ONE] * 100;
+                        WriteLine("Roll {0} - {1} Ones(s) - Total {2}", nRoll + 1, _count[ONE], iTempScore);
+                        nDice -= _count[ONE];
+                        _count[ONE] = 0;
                         nMult = ZERO;
                     }
 
-                    if (m_Count[FIVE] > 0 && m_Count[FIVE] < 3)
+                    if (_count[FIVE] > 0 && _count[FIVE] < 3)
                     {
-                        iTempScore += m_Count[FIVE] * 50;
-                        WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, m_Count[FIVE], iTempScore);
-                        nDice -= m_Count[FIVE];
-                        m_Count[FIVE] = 0;
+                        iTempScore += _count[FIVE] * 50;
+                        WriteLine("Roll {0} - {1} Five(s) - Total {2}", nRoll + 1, _count[FIVE], iTempScore);
+                        nDice -= _count[FIVE];
+                        _count[FIVE] = 0;
                         nMult = ZERO;
                     }
                 }
@@ -674,7 +749,7 @@ internal static class Program
                 if (nMult > ZERO)
                     WriteLine("{0} is the roll multiplier", nMult + 1);
 
-                int iChance = m_Rnd.Next(1, 101);
+                int iChance = _rnd.Next(1, 101);
                 if (iGameScoreCPU < 500)
                 {
                     if (iGameScoreCPU + iRollScore >= 500)
@@ -785,117 +860,5 @@ internal static class Program
         WriteLine("One      - 100");
         WriteLine("Five     - 50");
         WriteLine();
-    }
-
-    private static void Main(string[] args)
-    {
-        SeedRng(ref args);
-
-        bool bAgain = true;
-
-        while (bAgain)
-        {
-            Scoring();
-
-            bool bConvert = false;
-            int nPlayers = 0, nCPUs = 0, nPeople = 0;
-            do
-            {
-                Write("Number of players? ");
-                string? strPlayers = ReadLine();
-                bConvert = int.TryParse(strPlayers, out nPlayers);
-                if (bConvert)
-                {
-                    if (nPlayers < 2)
-                    {
-                        WriteLine("Not enough players");
-                        bConvert = false;
-                    }
-                    else
-                    {
-                        Write("How many are CPU? ");
-                        string? strCPUs = ReadLine();
-                        bConvert = int.TryParse(strCPUs, out nCPUs);
-                        if (!bConvert)
-                        {
-                            WriteLine("Input error, try again");
-                        }
-                        else
-                        {
-                            if (nCPUs < 0)
-                            {
-                                WriteLine("There must be 0 or more CPU players");
-                                bConvert = false;
-                            }
-                            else
-                            {
-                                if (nCPUs > nPlayers)
-                                {
-                                    WriteLine("Too many CPUs");
-                                    bConvert = false;
-                                }
-                                else
-                                {
-                                    nPeople = nPlayers - nCPUs;
-                                }
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    WriteLine("Input error, try again");
-                }
-            } while (!bConvert);
-
-            WriteLine("\r\nStarting order is Player(s) first, CPU(s) second. Good Luck!\r\n");
-
-            int[] PlayerScore = new int[nPlayers];
-
-            bool bGameLoop = true;
-            while (bGameLoop)
-            {
-                WriteLine("Lesters Teeth\r\n");
-                for (int iPlayer = 0; iPlayer < nPlayers; iPlayer++)
-                {
-                    if (iPlayer < nPeople)
-                        PlayerScore[iPlayer] = RollPlayer(PlayerScore[iPlayer], iPlayer + 1);
-                    else
-                        PlayerScore[iPlayer] = RollCPU(PlayerScore[iPlayer], iPlayer + 1);
-
-                    if (PlayerScore[iPlayer] > 10000)
-                    {
-                        bGameLoop = false;
-                        break;
-                    }
-                }
-            }
-
-            WriteLine();
-            for (int iPlayer = 0; iPlayer < nPlayers; iPlayer++)
-            {
-                if (PlayerScore[iPlayer] > 10000)
-                {
-                    if (iPlayer < nPeople)
-                        WriteLine("Player {0} scores {1} and wins!", iPlayer + 1, PlayerScore[iPlayer]);
-                    else
-                        WriteLine("CPU {0} scores {1} and wins!", iPlayer + 1 - nPeople, PlayerScore[iPlayer]);
-                }
-                else
-                {
-                    if (iPlayer < nPeople)
-                        WriteLine("Player {0} scores {1} and loses!", iPlayer + 1, PlayerScore[iPlayer]);
-                    else
-                        WriteLine("CPU {0} scores {1} and loses!", iPlayer + 1 - nPeople, PlayerScore[iPlayer]);
-                }
-            }
-
-            WriteLine();
-            WriteLine("Press A to play again.\r\n");
-            ConsoleKeyInfo cki = ReadKey(true);
-            string strKey = cki.KeyChar.ToString();
-            if (strKey != "A" && strKey != "a")
-                bAgain = false;
-        }
     }
 }
